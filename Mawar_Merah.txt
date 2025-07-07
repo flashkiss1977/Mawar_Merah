@@ -64,7 +64,7 @@ if (isset($_GET['delete'])) {
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>File Manager</title>
+    <title>Priv8 File Manager By Team FlashKiss</title>
     <style>
         /* Comic Sans MS Font Family */
         body, input, button, textarea, select, table, h1, h2, h3, h4, h5, h6 {
@@ -442,7 +442,7 @@ if (isset($_GET['delete'])) {
 </div>
 
 <footer>
-    © <?= $currentYear ?> | File Manager
+    © <?= $currentYear ?> | Priv8 File Manager By Team FlashKiss
 </footer>
 
 <div class="signature">FlashKiss</div>
